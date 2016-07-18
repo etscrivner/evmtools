@@ -1,8 +1,10 @@
 import core.stdc.stdlib;
+import std.bigint;
 import std.conv;
 import std.file;
 import std.stdio;
 import std.traits;
+import std.format;
 
 // Constants defining the Ethereum opcodes
 enum EvmOpcodes : ubyte {
@@ -145,7 +147,7 @@ enum EvmOpcodes : ubyte {
   SELFDESTRUCT = 0xff
 }
 
-pure string[ubyte] OpcodeNames() {
+pure string[ubyte] generateOpcodeToNameMap() {
   string[ubyte] results;
 
   foreach (immutable opcode; [EnumMembers!EvmOpcodes]) {
@@ -155,10 +157,72 @@ pure string[ubyte] OpcodeNames() {
   return results;
 }
 
+string[] disassembleBytecode(ubyte[] bytecode) {
+  string[] results;
+  auto nameForOpcode = generateOpcodeToNameMap();
+
+  for (size_t pc = 0; pc < bytecode.length;) {
+    auto opcode = bytecode[pc];
+
+    switch(opcode) {
+      case EvmOpcodes.PUSH1:
+      case EvmOpcodes.PUSH2:
+      case EvmOpcodes.PUSH3:
+      case EvmOpcodes.PUSH4:
+      case EvmOpcodes.PUSH5:
+      case EvmOpcodes.PUSH6:
+      case EvmOpcodes.PUSH7:
+      case EvmOpcodes.PUSH8:
+      case EvmOpcodes.PUSH9:
+      case EvmOpcodes.PUSH10:
+      case EvmOpcodes.PUSH11:
+      case EvmOpcodes.PUSH12:
+      case EvmOpcodes.PUSH13:
+      case EvmOpcodes.PUSH14:
+      case EvmOpcodes.PUSH15:
+      case EvmOpcodes.PUSH16:
+      case EvmOpcodes.PUSH17:
+      case EvmOpcodes.PUSH18:
+      case EvmOpcodes.PUSH19:
+      case EvmOpcodes.PUSH20:
+      case EvmOpcodes.PUSH21:
+      case EvmOpcodes.PUSH22:
+      case EvmOpcodes.PUSH23:
+      case EvmOpcodes.PUSH24:
+      case EvmOpcodes.PUSH25:
+      case EvmOpcodes.PUSH26:
+      case EvmOpcodes.PUSH27:
+      case EvmOpcodes.PUSH28:
+      case EvmOpcodes.PUSH29:
+      case EvmOpcodes.PUSH30:
+      case EvmOpcodes.PUSH31:
+      case EvmOpcodes.PUSH32:
+        size_t numBytes = (opcode - EvmOpcodes.PUSH1 + 1);
+        BigInt arg = BigInt(0);
+        for (ubyte i = 1; i <= numBytes; i++) {
+          arg <<= 8;
+          if (pc + i < bytecode.length) {
+            arg |= bytecode[pc + i];
+          }
+        }
+        results ~= format("%s 0x%032x", nameForOpcode[opcode], arg);
+        pc += numBytes;
+        break;
+      default:
+        if (opcode in nameForOpcode) {
+          results ~= nameForOpcode[opcode];
+        }
+        pc++;
+    }
+  }
+
+  return results;
+}
+
 int main(string[] args) {
   // Error if filename was not provided
-  if (args.length < 2) {
-    writeln("Usage: disassemble [FILENAME]");
+  if (args.length < 3) {
+    writeln("Usage: disassemble [INPUT] [OUTPUT]");
     writeln("Takes a file containing binary smart contract bytecode and");
     writeln("prints the disassembled bytecode");
     return 1;
@@ -170,8 +234,19 @@ int main(string[] args) {
      return 1;
   }
 
-  writeln(OpcodeNames[EvmOpcodes.STOP]);
+  string outputFile = args[2];
+  if (outputFile.exists) {
+    writeln("bcstr2bcbin: error: output file already exists ", outputFile);
+    return 1;
+  }
 
-  ubyte[] data = cast(ubyte[])read(filename);
+  ubyte[] bytecode = cast(ubyte[])read(filename);
+
+  string[] result = disassembleBytecode(bytecode);
+  File output = File(outputFile, "w");
+  foreach (line; result) {
+    output.writeln(line);
+  }
+  output.close();
   return 0;
 }
