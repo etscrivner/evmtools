@@ -1,0 +1,13 @@
+contract Test {
+    function double(uint a) returns (uint) {
+        return multiply(a, 2);
+    }
+
+    function triple(uint a) returns (uint) {
+        return multiply(a, 3);
+    }
+
+    function multiply(uint a, uint b) internal returns (uint) {
+        return a * b;
+    }
+}

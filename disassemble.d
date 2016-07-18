@@ -161,7 +161,7 @@ string[] disassembleBytecode(ubyte[] bytecode) {
   string[] results;
   auto nameForOpcode = generateOpcodeToNameMap();
 
-  for (size_t pc = 0; pc < bytecode.length;) {
+  for (size_t pc = 0; pc < bytecode.length; pc++) {
     auto opcode = bytecode[pc];
 
     switch(opcode) {
@@ -212,7 +212,7 @@ string[] disassembleBytecode(ubyte[] bytecode) {
         if (opcode in nameForOpcode) {
           results ~= nameForOpcode[opcode];
         }
-        pc++;
+        break;
     }
   }
 
