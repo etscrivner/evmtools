@@ -2,6 +2,7 @@ import core.stdc.stdlib;
 import std.bigint;
 import std.conv;
 import std.file;
+import std.range;
 import std.stdio;
 import std.traits;
 import std.format;
@@ -147,6 +148,30 @@ enum EvmOpcodes : ubyte {
   SELFDESTRUCT = 0xff
 }
 
+/**
+ * Converts a long hexadecimal string into an array of bytes.
+ *
+ * Params:
+ *      hexString = A string containing hexadecimal bytes.
+ *
+ * Returns: An array of bytes in the same order they appear in the string.
+ */
+ubyte[] hexStringToByteArray(string hexString) {
+  ubyte[] binaryBytecode;
+
+  foreach (i; iota(0, hexString.length, 2)) {
+    string nextByte = hexString[i..(i + 2)];
+    binaryBytecode ~= parse!ubyte(nextByte, 16);
+  }
+
+  return binaryBytecode;
+}
+
+/**
+ * Generates a mapping of opcode values to opcode names.
+ *
+ * Returns: An associative array from byte values to opcode name strings.
+ */
 pure string[ubyte] generateOpcodeToNameMap() {
   string[ubyte] results;
 
@@ -157,6 +182,15 @@ pure string[ubyte] generateOpcodeToNameMap() {
   return results;
 }
 
+/**
+ * Converts a series of bytes into a list of opcode names and arguments.
+ *
+ * Params:
+ *      bytecode = Array of bytes containing Ethereum opcodes.
+ *
+ * Returns: An array of strings corresponding to opcodes. String opcodes are
+ *      in same order as opcodes in byte array.
+ */
 string[] disassembleBytecode(ubyte[] bytecode) {
   string[] results;
   auto nameForOpcode = generateOpcodeToNameMap();
@@ -197,7 +231,11 @@ string[] disassembleBytecode(ubyte[] bytecode) {
       case EvmOpcodes.PUSH30:
       case EvmOpcodes.PUSH31:
       case EvmOpcodes.PUSH32:
+        // Get the number of bytes for the argument by doing some math on the
+        // opcode. Produces a number in range [1, 32].
         size_t numBytes = (opcode - EvmOpcodes.PUSH1 + 1);
+        // Iterate through the bytes for the argument and consolidate them into
+        // a single integer value.
         BigInt arg = BigInt(0);
         for (ubyte i = 1; i <= numBytes; i++) {
           arg <<= 8;
@@ -206,6 +244,7 @@ string[] disassembleBytecode(ubyte[] bytecode) {
           }
         }
         results ~= format("%s 0x%032x", nameForOpcode[opcode], arg);
+        // Ensure that we skip past the bytes for the argument
         pc += numBytes;
         break;
       default:
@@ -223,14 +262,14 @@ int main(string[] args) {
   // Error if filename was not provided
   if (args.length < 3) {
     writeln("Usage: disassemble [INPUT] [OUTPUT]");
-    writeln("Takes a file containing binary smart contract bytecode and");
-    writeln("prints the disassembled bytecode");
+    writeln("Takes a file containing string smart contract bytecode and");
+    writeln("prints the disassembled opcodes");
     return 1;
   }
 
-  string filename = args[1];
-  if (!filename.exists) {
-     writeln("disassemble: error: unable to find file ", filename);
+  string inputFile = args[1];
+  if (!inputFile.exists) {
+     writeln("disassemble: error: unable to find file ", inputFile);
      return 1;
   }
 
@@ -240,13 +279,15 @@ int main(string[] args) {
     return 1;
   }
 
-  ubyte[] bytecode = cast(ubyte[])read(filename);
+  string vmBytes = readText(inputFile);
+  ubyte[] vmBytecode = hexStringToByteArray(vmBytes);
+  string[] result = disassembleBytecode(vmBytecode);
 
-  string[] result = disassembleBytecode(bytecode);
   File output = File(outputFile, "w");
   foreach (line; result) {
     output.writeln(line);
   }
   output.close();
+
   return 0;
 }
